@@ -1,0 +1,115 @@
+
+import java.io.IOException;
+import java.util.StringTokenizer;
+import java.util.regex.Pattern;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+import java.io.*;
+
+import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.io.WritableComparator;
+
+
+
+public class HWFinal {
+
+	public static class The2ndLetterMap
+	  extends Mapper<Object, Text, Text, IntWritable>{
+
+	private final static IntWritable one = new IntWritable(1);
+	private Text word = new Text();
+
+	 public void map(Object key, Text value, Context context
+             ) throws IOException, InterruptedException {
+    	StringTokenizer itr = new StringTokenizer(value.toString().toLowerCase());
+
+     while (itr.hasMoreTokens()) {
+     String token = itr.nextToken();
+     token = token.replaceAll("[^a-zA-Z]","");
+ 	if ( (token.length()>1) && (Character.isAlphabetic(token.charAt(1))) ) {   
+ 			context.write(new Text(String.valueOf(token.charAt(1))), one); 
+ 	}
+
+ 	
+ } 
+}
+}
+	
+
+  public static class FirstReduce
+       extends Reducer<Text,IntWritable,Text,IntWritable> {
+    private IntWritable result = new IntWritable();
+
+    public void reduce(Text key, Iterable<IntWritable> values,
+                       Context context
+                       ) throws IOException, InterruptedException {
+      int sum = 0;
+      for (IntWritable val : values) {
+        sum += val.get();
+      }
+      result.set(sum);
+      context.write(key, result);
+    }
+  }
+
+  public static class SortMapper
+  extends Mapper<Object,Text,IntWritable,Text>{
+
+public void map(Object key, Text value, Context context
+               ) throws IOException, InterruptedException {
+	String[] kv = value.toString().split("\t");  
+    String word = kv[0];   
+    int count = Integer.parseInt(kv[1]);
+   	context.write(new IntWritable(count), new Text(word)); 
+   	}
+}
+  
+  public static class SortReducer
+  extends Reducer<IntWritable,Text,IntWritable,Text> {
+  private IntWritable result = new IntWritable();
+
+   public void reduce (Iterable<IntWritable> key,Text values, 
+                       Context context
+                ) throws IOException, InterruptedException {
+  context.write((IntWritable) key, values);
+}
+}
+    
+  public static void main(String[] args) throws Exception {
+    Configuration conf = new Configuration();
+    Job job = Job.getInstance(conf, "word count");
+    job.setJarByClass(HWFinal.class);
+    job.setMapperClass(The2ndLetterMap.class);
+    job.setCombinerClass(FirstReduce.class);
+    job.setReducerClass(FirstReduce.class);
+    job.setOutputKeyClass(Text.class);
+    job.setOutputValueClass(IntWritable.class);
+    FileInputFormat.addInputPath(job, new Path(args[0]));
+    FileOutputFormat.setOutputPath(job, new Path(args[1]));
+    job.waitForCompletion(true);
+      
+    Configuration conf2 = new Configuration();
+    Job job2 = Job.getInstance(conf2, "2nd letter & sort");
+    job2.setJarByClass(HWFinal.class);
+    job2.setMapperClass(SortMapper.class);
+    job2.setCombinerClass(SortReducer.class);
+    job2.setReducerClass(SortReducer.class);
+    job2.setOutputKeyClass(IntWritable.class);
+    job2.setOutputValueClass(Text.class);
+    job2.setSortComparatorClass(SortFloatComparator.class);
+    FileInputFormat.addInputPath(job2, new Path(args[1]));
+    FileOutputFormat.setOutputPath(job2, new Path(args[2]));  
+    System.exit(job2.waitForCompletion(true) ? 0 : 1);
+  }
+}
+
